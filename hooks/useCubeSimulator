@@ -1,0 +1,209 @@
+import { useState, useEffect, useRef } from 'react';
+import { CubeState, MoveHistoryItem, Color } from '../types/cube';
+import { RubiksCube } from '../utils/cubeLogic';
+import { KociembaSolver } from '../utils/kociemba';
+
+export const useCubeSimulator = () => {
+  const [cube] = useState(() => new RubiksCube());
+  const [solver] = useState(() => new KociembaSolver());
+  const [cubeState, setCubeState] = useState<CubeState>(cube.getState());
+  const [historyState, setHistoryState] = useState({
+    history: [] as MoveHistoryItem[],
+    currentIndex: -1
+  });
+  const [solution, setSolution] = useState<string[]>([]);
+  const [currentSolutionIndex, setCurrentSolutionIndex] = useState(-1);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [editMode, setEditMode] = useState(false);
+  const [selectedColor, setSelectedColor] = useState<Color>('W');
+  const playbackIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Auto-play functionality
+  useEffect(() => {
+    if (isPlaying && solution.length > 0 && currentSolutionIndex < solution.length - 1) {
+      playbackIntervalRef.current = setInterval(() => {
+        setCurrentSolutionIndex(prev => {
+          const next = prev + 1;
+          if (next < solution.length) {
+            executeSingleMove(solution[next]);
+            return next;
+          } else {
+            setIsPlaying(false);
+            return prev;
+          }
+        });
+      }, 1000);
+    } else {
+      if (playbackIntervalRef.current) {
+        clearInterval(playbackIntervalRef.current);
+        playbackIntervalRef.current = null;
+      }
+    }
+
+    return () => {
+      if (playbackIntervalRef.current) {
+        clearInterval(playbackIntervalRef.current);
+      }
+    };
+  }, [isPlaying, solution, currentSolutionIndex]);
+
+  const addToHistory = (move: string, state: CubeState) => {
+    const newHistoryItem: MoveHistoryItem = {
+      move,
+      cubeState: state,
+      timestamp: Date.now()
+    };
+    
+    setHistoryState(prev => ({
+      history: [...prev.history.slice(0, prev.currentIndex + 1), newHistoryItem],
+      currentIndex: prev.currentIndex + 1
+    }));
+  };
+
+  const executeMoves = (moveSequence: string) => {
+    const moves = cube.parseMoveSequence(moveSequence);
+    
+    moves.forEach(move => {
+      cube.executeMove(move);
+      const newState = cube.getState();
+      addToHistory(move, newState);
+      setCubeState(newState);
+    });
+  };
+
+  const executeSingleMove = (move: string) => {
+    cube.executeMove(move);
+    const newState = cube.getState();
+    addToHistory(move, newState);
+    setCubeState(newState);
+  };
+
+  const reset = () => {
+    cube.reset();
+    const newState = cube.getState();
+    setCubeState(newState);
+    setHistoryState({
+      history: [],
+      currentIndex: -1
+    });
+    setSolution([]);
+    setCurrentSolutionIndex(-1);
+    setIsPlaying(false);
+  };
+
+  const scramble = () => {
+    cube.scramble();
+    const newState = cube.getState();
+    setCubeState(newState);
+    addToHistory('SCRAMBLE', newState);
+    setSolution([]);
+    setCurrentSolutionIndex(-1);
+  };
+
+  const solve = () => {
+    const currentState = cube.getState();
+    const solutionMoves = solver.solve(currentState);
+    setSolution(solutionMoves);
+    setCurrentSolutionIndex(-1);
+    
+    if (solutionMoves.length === 0) {
+      alert('Cube is already solved!');
+    }
+  };
+
+  const goToPreviousMove = () => {
+    if (historyState.currentIndex > 0) {
+      const previousIndex = historyState.currentIndex - 1;
+      const previousState = historyState.history[previousIndex].cubeState;
+      cube.setState(previousState);
+      setCubeState(previousState);
+      setHistoryState(prev => ({
+        ...prev,
+        currentIndex: previousIndex
+      }));
+    } else if (historyState.currentIndex === 0) {
+      cube.reset();
+      setCubeState(cube.getState());
+      setHistoryState(prev => ({
+        ...prev,
+        currentIndex: -1
+      }));
+    }
+  };
+
+  const goToNextMove = () => {
+    if (historyState.currentIndex < historyState.history.length - 1) {
+      const nextIndex = historyState.currentIndex + 1;
+      const nextState = historyState.history[nextIndex].cubeState;
+      cube.setState(nextState);
+      setCubeState(nextState);
+      setHistoryState(prev => ({
+        ...prev,
+        currentIndex: nextIndex
+      }));
+    }
+  };
+
+  const goToHistoryIndex = (index: number) => {
+    if (index >= -1 && index < historyState.history.length) {
+      if (index === -1) {
+        cube.reset();
+        setCubeState(cube.getState());
+      } else {
+        const targetState = historyState.history[index].cubeState;
+        cube.setState(targetState);
+        setCubeState(targetState);
+      }
+      setHistoryState(prev => ({
+        ...prev,
+        currentIndex: index
+      }));
+    }
+  };
+
+  const togglePlay = () => {
+    if (solution.length === 0) {
+      alert('No solution available. Please solve the cube first.');
+      return;
+    }
+    setIsPlaying(!isPlaying);
+  };
+
+  const editSticker = (face: string, row: number, col: number) => {
+    if (!editMode) return;
+    
+    const newState = { ...cubeState };
+    newState[face as keyof CubeState][row][col] = selectedColor;
+    setCubeState(newState);
+    cube.setState(newState);
+  };
+
+  const toggleEditMode = () => {
+    setEditMode(!editMode);
+  };
+
+  return {
+    cubeState,
+    moveHistory: historyState.history,
+    currentHistoryIndex: historyState.currentIndex,
+    solution,
+    currentSolutionIndex,
+    isPlaying,
+    editMode,
+    selectedColor,
+    executeMoves,
+    reset,
+    scramble,
+    solve,
+    goToPreviousMove,
+    goToNextMove,
+    goToHistoryIndex,
+    togglePlay,
+    editSticker,
+    toggleEditMode,
+    setSelectedColor,
+    canUndo: historyState.currentIndex >= 0,
+    canRedo: historyState.currentIndex < historyState.history.length - 1,
+    isSolved: cube.isSolved()
+  };
+};
