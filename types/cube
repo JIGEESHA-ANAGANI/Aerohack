@@ -1,0 +1,23 @@
+export type Face = 'U' | 'R' | 'F' | 'D' | 'L' | 'B';
+export type Color = 'W' | 'R' | 'B' | 'O' | 'G' | 'Y';
+export type Move = 'U' | 'U\'' | 'U2' | 'R' | 'R\'' | 'R2' | 'F' | 'F\'' | 'F2' | 'D' | 'D\'' | 'D2' | 'L' | 'L\'' | 'L2' | 'B' | 'B\'' | 'B2';
+
+export interface CubeState {
+  U: Color[][];
+  R: Color[][];
+  F: Color[][];
+  D: Color[][];
+  L: Color[][];
+  B: Color[][];
+}
+
+export interface Position {
+  x: number;
+  y: number;
+}
+
+export interface MoveHistoryItem {
+  move: string;
+  cubeState: CubeState;
+  timestamp: number;
+}
