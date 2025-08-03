@@ -2,7 +2,7 @@
 
 A comprehensive, interactive web-based Rubik's Cube simulator featuring unlimited move input, real-time visualization, and advanced Kociemba solver integration. Built with React, TypeScript, and Tailwind CSS for a modern, responsive experience.
 
-![Rubik's Cube Simulator](https://images.pexels.com/photos/19670/pexels-photo.jpg?auto=compress&cs=tinysrgb&w=800)
+
 
 ## 🌟 Features
 
